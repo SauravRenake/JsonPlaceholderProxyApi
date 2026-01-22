@@ -11,19 +11,30 @@ namespace JsonPlaceholderProxyApi.Controllers
     {
         private readonly IPostService _postService;
 
+        private const string CorrelationIdKey = "X-Correlation-Id";
+
         public PostsController(IPostService postService)
         {
             _postService = postService;
         }
 
+        // Centralized accessor for CorrelationId
+        private string CorrelationId =>
+            HttpContext.Items[CorrelationIdKey]?.ToString() ?? "N/A";
+
         [HttpGet]
         public async Task<IActionResult> GetPosts()
         {
-            Log.Information("GET /posts called");
+            Log.Information(
+                "Request started: GET /posts | CorrelationId={CorrelationId}",
+                CorrelationId);
 
             var posts = await _postService.GetPostsAsync();
 
-            Log.Information($"Found {posts.Count()} posts");
+            Log.Information(
+                "Request completed: GET /posts | ReturnedCount={Count} | CorrelationId={CorrelationId}",
+                posts.Count(),
+                CorrelationId);
 
             return Ok(posts);
         }
@@ -31,54 +42,101 @@ namespace JsonPlaceholderProxyApi.Controllers
         [HttpGet("{postId}")]
         public async Task<IActionResult> GetPost(int postId)
         {
-            Log.Information("GET /posts/{PostId} called", postId);
+            Log.Information(
+                "Request started: GET /posts/{PostId} | CorrelationId={CorrelationId}",
+                postId,
+                CorrelationId);
 
             var post = await _postService.GetPostByIdAsync(postId);
 
-            if (post.id == 0)
+            if (post == null || post.id == 0)
             {
-                Log.Warning("Post with ID {PostId} not found", postId);
+                Log.Warning(
+                    "Post not found | PostId={PostId} | CorrelationId={CorrelationId}",
+                    postId,
+                    CorrelationId);
+
                 return NotFound();
             }
 
-            Log.Information("Found post with ID {PostId}", postId);
+            Log.Information(
+                "Request completed: GET /posts/{PostId} | CorrelationId={CorrelationId}",
+                postId,
+                CorrelationId);
+
             return Ok(post);
         }
 
         [HttpPost]
         public async Task<IActionResult> CreatePost([FromBody] PostDto post)
         {
-            Log.Information("POST /posts called");
+            Log.Information(
+                "Request started: POST /posts | CorrelationId={CorrelationId}",
+                CorrelationId);
 
             var createdPost = await _postService.CreatePostAsync(post);
 
-            Log.Information("Created post with ID {PostId}", createdPost.id);
+            Log.Information(
+                "Post created successfully | PostId={PostId} | CorrelationId={CorrelationId}",
+                createdPost?.id,
+                CorrelationId);
 
             return Ok(createdPost);
         }
 
         [HttpPut("{postId}")]
-        public async Task<IActionResult> UpdatePost(int postId, PostDto post)
+        public async Task<IActionResult> UpdatePost(int postId, [FromBody] PostDto post)
         {
-            Log.Information("PUT /posts/{PostId} called", postId);
+            Log.Information(
+                "Request started: PUT /posts/{PostId} | CorrelationId={CorrelationId}",
+                postId,
+                CorrelationId);
 
-            return Ok(await _postService.UpdatePostAsync(postId, post));
+            var updatedPost = await _postService.UpdatePostAsync(postId, post);
+
+            Log.Information(
+                "Post updated successfully | PostId={PostId} | CorrelationId={CorrelationId}",
+                postId,
+                CorrelationId);
+
+            return Ok(updatedPost);
         }
 
         [HttpPatch("{postId}")]
-        public async Task<IActionResult> PatchPost(int postId, object post)
+        public async Task<IActionResult> PatchPost(int postId, [FromBody] object post)
         {
-            Log.Information("PATCH /posts/{PostId} called", postId);
+            Log.Information(
+                "Request started: PATCH /posts/{PostId} | CorrelationId={CorrelationId}",
+                postId,
+                CorrelationId);
 
-            return Ok(await _postService.PatchPostAsync(postId, post));
+            var patchedPost = await _postService.PatchPostAsync(postId, post);
+
+            Log.Information(
+                "Post patched successfully | PostId={PostId} | CorrelationId={CorrelationId}",
+                postId,
+                CorrelationId);
+
+            return Ok(patchedPost);
         }
 
         [HttpDelete("{postId}")]
         public async Task<IActionResult> DeletePost(int postId)
         {
-            Log.Information("DELETE /posts/{PostId} called", postId);
+            Log.Information(
+                "Request started: DELETE /posts/{PostId} | CorrelationId={CorrelationId}",
+                postId,
+                CorrelationId);
 
-            return Ok(await _postService.DeletePostAsync(postId));
+            var result = await _postService.DeletePostAsync(postId);
+
+            Log.Information(
+                "Post deleted | PostId={PostId} | Success={Success} | CorrelationId={CorrelationId}",
+                postId,
+                result,
+                CorrelationId);
+
+            return Ok(result);
         }
     }
 }

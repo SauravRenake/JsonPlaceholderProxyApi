@@ -1,5 +1,6 @@
 using JsonPlaceholderProxyApi.Services;
 using JsonPlaceholderProxyApi.Services.Interfaces;
+using JsonPlaceholderProxyApi.Middleware;
 using Serilog;
 using Serilog.Events;
 
@@ -12,6 +13,9 @@ builder.Services.AddSwaggerGen();
 
 // HttpClient for calling JSONPlaceholder APIs
 builder.Services.AddHttpClient();
+
+// REQUIRED for CorrelationId access in services
+builder.Services.AddHttpContextAccessor();
 
 // Dependency Injection
 builder.Services.AddScoped<IPostService, PostService>();
@@ -38,6 +42,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+// Correlation ID middleware
+app.UseMiddleware<CorrelationIdMiddleware>();
+
+// Authorization middleware
 app.UseAuthorization();
 app.MapControllers();
 
