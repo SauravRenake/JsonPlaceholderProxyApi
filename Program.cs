@@ -25,7 +25,7 @@ var app = builder.Build();
 // Serilog initialization (SAFE LOCATION)
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
-    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Fatal)
     .MinimumLevel.Override("System", LogEventLevel.Warning)
     .WriteTo.Console()
     .WriteTo.File(

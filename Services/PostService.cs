@@ -1,8 +1,9 @@
 using System.Net.Http.Json;
 using JsonPlaceholderProxyApi.Models;
 using JsonPlaceholderProxyApi.Services.Interfaces;
-using Serilog;
 using Microsoft.AspNetCore.Http;
+using Serilog;
+using JsonPlaceholderProxyApi.Exceptions;
 
 namespace JsonPlaceholderProxyApi.Services
 {
@@ -20,7 +21,6 @@ namespace JsonPlaceholderProxyApi.Services
             _httpContextAccessor = httpContextAccessor;
         }
 
-        // Centralized CorrelationId access
         private string CorrelationId =>
             _httpContextAccessor.HttpContext?.Items[CorrelationIdKey]?.ToString() ?? "N/A";
 
@@ -42,14 +42,10 @@ namespace JsonPlaceholderProxyApi.Services
 
                 return posts;
             }
-            catch (Exception ex)
+            catch (HttpRequestException)
             {
-                Log.Error(
-                    ex,
-                    "Service error: Failed to fetch posts | CorrelationId={CorrelationId}",
-                    CorrelationId);
-
-                throw;
+                throw new ExternalServiceException(
+                    "Failed to fetch posts from JSONPlaceholder");
             }
         }
 
@@ -59,25 +55,42 @@ namespace JsonPlaceholderProxyApi.Services
                 "Service started: Fetching post by id | PostId={PostId} | CorrelationId={CorrelationId}",
                 postId,
                 CorrelationId);
-
-            var post = await _httpClient.GetFromJsonAsync<PostDto>($"{BaseUrl}/{postId}");
-
-            if (post == null || post.id == 0)
+            if (postId <= 0)
             {
-                Log.Warning(
-                    "Service warning: Post not found | PostId={PostId} | CorrelationId={CorrelationId}",
-                    postId,
-                    CorrelationId);
-
-                return new PostDto();
+                throw new BadRequestException("PostId must be greater than zero");
             }
 
             Log.Information(
-                "Service completed: Post fetched | PostId={PostId} | CorrelationId={CorrelationId}",
+                "Service started: Fetching post by id | PostId={PostId} | CorrelationId={CorrelationId}",
                 postId,
                 CorrelationId);
 
-            return post;
+            try
+            {
+                var post = await _httpClient.GetFromJsonAsync<PostDto>($"{BaseUrl}/{postId}");
+
+                if (post == null || post.id == 0)
+                {
+                    Log.Warning(
+                        "Post not found | PostId={PostId} | CorrelationId={CorrelationId}",
+                        postId,
+                        CorrelationId);
+
+                    throw new NotFoundException($"Post with id {postId} not found");
+                }
+
+                Log.Information(
+                    "Service completed: Post fetched | PostId={PostId} | CorrelationId={CorrelationId}",
+                    postId,
+                    CorrelationId);
+
+                return post;
+            }
+            catch (HttpRequestException)
+            {
+                throw new ExternalServiceException(
+                    "Failed to fetch post from JSONPlaceholder");
+            }
         }
 
         public async Task<PostDto> CreatePostAsync(PostDto post)
@@ -86,16 +99,25 @@ namespace JsonPlaceholderProxyApi.Services
                 "Service started: Creating post | CorrelationId={CorrelationId}",
                 CorrelationId);
 
-            var response = await _httpClient.PostAsJsonAsync(BaseUrl, post);
-            var createdPost = await response.Content.ReadFromJsonAsync<PostDto>()
-                              ?? new PostDto();
+            try
+            {
+                var response = await _httpClient.PostAsJsonAsync(BaseUrl, post);
 
-            Log.Information(
-                "Service completed: Post created | PostId={PostId} | CorrelationId={CorrelationId}",
-                createdPost.id,
-                CorrelationId);
+                var createdPost = await response.Content.ReadFromJsonAsync<PostDto>()
+                                  ?? new PostDto();
 
-            return createdPost;
+                Log.Information(
+                    "Service completed: Post created | PostId={PostId} | CorrelationId={CorrelationId}",
+                    createdPost.id,
+                    CorrelationId);
+
+                return createdPost;
+            }
+            catch (HttpRequestException)
+            {
+                throw new ExternalServiceException(
+                    "Failed to create post in JSONPlaceholder");
+            }
         }
 
         public async Task<PostDto> UpdatePostAsync(int postId, PostDto post)
@@ -104,54 +126,99 @@ namespace JsonPlaceholderProxyApi.Services
                 "Service started: Updating post | PostId={PostId} | CorrelationId={CorrelationId}",
                 postId,
                 CorrelationId);
-
-            var response = await _httpClient.PutAsJsonAsync($"{BaseUrl}/{postId}", post);
-            var updatedPost = await response.Content.ReadFromJsonAsync<PostDto>()
-                              ?? new PostDto();
+            if (postId <= 0)
+            {
+                throw new BadRequestException("PostId must be greater than zero");
+            }
 
             Log.Information(
-                "Service completed: Post updated | PostId={PostId} | CorrelationId={CorrelationId}",
+                "Service started: Updating post | PostId={PostId} | CorrelationId={CorrelationId}",
                 postId,
                 CorrelationId);
 
-            return updatedPost;
+            try
+            {
+                var response = await _httpClient.PutAsJsonAsync($"{BaseUrl}/{postId}", post);
+
+                var updatedPost = await response.Content.ReadFromJsonAsync<PostDto>()
+                                  ?? new PostDto();
+
+                Log.Information(
+                    "Service completed: Post updated | PostId={PostId} | CorrelationId={CorrelationId}",
+                    postId,
+                    CorrelationId);
+
+                return updatedPost;
+            }
+            catch (HttpRequestException)
+            {
+                throw new ExternalServiceException(
+                    "Failed to update post in JSONPlaceholder");
+            }
         }
 
         public async Task<PostDto> PatchPostAsync(int postId, object post)
         {
+            if (postId <= 0)
+            {
+                throw new BadRequestException("PostId must be greater than zero");
+            }
+
             Log.Information(
                 "Service started: Patching post | PostId={PostId} | CorrelationId={CorrelationId}",
                 postId,
                 CorrelationId);
 
-            var response = await _httpClient.PatchAsJsonAsync($"{BaseUrl}/{postId}", post);
-            var patchedPost = await response.Content.ReadFromJsonAsync<PostDto>()
-                              ?? new PostDto();
+            try
+            {
+                var response = await _httpClient.PatchAsJsonAsync($"{BaseUrl}/{postId}", post);
 
-            Log.Information(
-                "Service completed: Post patched | PostId={PostId} | CorrelationId={CorrelationId}",
-                postId,
-                CorrelationId);
+                var patchedPost = await response.Content.ReadFromJsonAsync<PostDto>()
+                                  ?? new PostDto();
 
-            return patchedPost;
+                Log.Information(
+                    "Service completed: Post patched | PostId={PostId} | CorrelationId={CorrelationId}",
+                    postId,
+                    CorrelationId);
+
+                return patchedPost;
+            }
+            catch (HttpRequestException)
+            {
+                throw new ExternalServiceException(
+                    "Failed to patch post in JSONPlaceholder");
+            }
         }
 
         public async Task<bool> DeletePostAsync(int postId)
         {
+            if (postId <= 0)
+            {
+                throw new BadRequestException("PostId must be greater than zero");
+            }
+
             Log.Information(
                 "Service started: Deleting post | PostId={PostId} | CorrelationId={CorrelationId}",
                 postId,
                 CorrelationId);
 
-            var response = await _httpClient.DeleteAsync($"{BaseUrl}/{postId}");
+            try
+            {
+                var response = await _httpClient.DeleteAsync($"{BaseUrl}/{postId}");
 
-            Log.Information(
-                "Service completed: Post deleted | PostId={PostId} | Success={Success} | CorrelationId={CorrelationId}",
-                postId,
-                response.IsSuccessStatusCode,
-                CorrelationId);
+                Log.Information(
+                    "Service completed: Post deleted | PostId={PostId} | Success={Success} | CorrelationId={CorrelationId}",
+                    postId,
+                    response.IsSuccessStatusCode,
+                    CorrelationId);
 
-            return response.IsSuccessStatusCode;
+                return response.IsSuccessStatusCode;
+            }
+            catch (HttpRequestException)
+            {
+                throw new ExternalServiceException(
+                    "Failed to delete post in JSONPlaceholder");
+            }
         }
     }
 }
