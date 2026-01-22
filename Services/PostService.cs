@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using JsonPlaceholderProxyApi.Models;
 using JsonPlaceholderProxyApi.Services.Interfaces;
+using Serilog;
 
 namespace JsonPlaceholderProxyApi.Services
 {
@@ -14,10 +15,24 @@ namespace JsonPlaceholderProxyApi.Services
             _httpClient = httpClient;
         }
 
+        // public async Task<IEnumerable<PostDto>> GetPostsAsync()
+        // {
+        //     return await _httpClient.GetFromJsonAsync<IEnumerable<PostDto>>(BaseUrl)
+        //            ?? Enumerable.Empty<PostDto>();
+        // }
+
         public async Task<IEnumerable<PostDto>> GetPostsAsync()
         {
-            return await _httpClient.GetFromJsonAsync<IEnumerable<PostDto>>(BaseUrl)
-                   ?? Enumerable.Empty<PostDto>();
+            try
+            {
+                return await _httpClient.GetFromJsonAsync<IEnumerable<PostDto>>(BaseUrl)
+                       ?? Enumerable.Empty<PostDto>();
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Error while fetching posts from JSONPlaceholder");
+                throw;
+            }
         }
 
         public async Task<PostDto> GetPostByIdAsync(int postId)

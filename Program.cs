@@ -1,5 +1,7 @@
 using JsonPlaceholderProxyApi.Services;
 using JsonPlaceholderProxyApi.Services.Interfaces;
+using Serilog;
+using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,7 +18,18 @@ builder.Services.AddScoped<IPostService, PostService>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline
+// Serilog initialization (SAFE LOCATION)
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+    .MinimumLevel.Override("System", LogEventLevel.Warning)
+    .WriteTo.Console()
+    .WriteTo.File(
+        path: "Logs/app-.log",
+        rollingInterval: RollingInterval.Day,
+        shared: true)
+    .CreateLogger();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -26,8 +39,6 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseAuthorization();
-
-// IMPORTANT: Maps controller routes (e.g. /posts)
 app.MapControllers();
 
 app.Run();
