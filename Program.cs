@@ -22,6 +22,21 @@ builder.Services.AddScoped<IPostService, PostService>();
 
 var app = builder.Build();
 
+
+//
+// --------------------
+// Runtime info (Docker check)
+// --------------------
+var isRunningInDocker =
+    Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER");
+
+Log.Information(
+    "Application starting | Environment={Environment} | RunningInDocker={Docker}",
+    app.Environment.EnvironmentName,
+    isRunningInDocker ?? "false");
+
+
+
 // Serilog initialization (SAFE LOCATION)
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
@@ -49,4 +64,14 @@ app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseAuthorization();
 app.MapControllers();
 
+
+// --------------------
+// Optional: env check endpoint (safe to keep)
+// --------------------
+app.MapGet("/env", () => new
+{
+    Environment = app.Environment.EnvironmentName,
+    IsRunningInDocker = Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER"),
+    MachineName = Environment.MachineName
+});
 app.Run();
